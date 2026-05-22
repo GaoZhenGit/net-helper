@@ -3,26 +3,12 @@
 
 #include <cstdint>
 #include <cstring>
+#include "net_common.h"
 
 #ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #pragma comment(lib, "ws2_32.lib")
-
-namespace {
-    static int s_wsa_ref = 0;
-    inline bool wsa_init() {
-        if (s_wsa_ref++ == 0) {
-            WSADATA wsa;
-            return WSAStartup(MAKEWORD(2, 2), &wsa) == 0;
-        }
-        return true;
-    }
-    inline void wsa_cleanup() {
-        if (--s_wsa_ref == 0)
-            WSACleanup();
-    }
-}
 
 using socket_t = SOCKET;
 constexpr socket_t INVALID_SOCK = INVALID_SOCKET;
@@ -78,9 +64,7 @@ public:
         if (fd_ != INVALID_SOCK) {
             sock_close(fd_);
             fd_ = INVALID_SOCK;
-#ifdef _WIN32
-            wsa_cleanup();
-#endif
+            net::wsa_cleanup();
         }
     }
 
@@ -88,9 +72,7 @@ protected:
     socket_t fd_;
 
     bool create(int family, int type, int proto) {
-#ifdef _WIN32
-        if (!wsa_init()) return false;
-#endif
+        if (!net::wsa_init()) return false;
         fd_ = socket(family, type, proto);
         return fd_ != INVALID_SOCK;
     }
