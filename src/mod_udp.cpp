@@ -1,4 +1,4 @@
-// mod_udp.cpp — UDP communication module implementation
+// mod_udp.cpp — UDP communication module
 #include "mod_udp.h"
 #include "socket.h"
 #include "net_common.h"
@@ -10,16 +10,6 @@
 #include <mutex>
 
 static std::atomic<bool> s_running{true};
-static std::mutex s_print_mutex;
-
-static void raw_write_all(const char* p, int len) {
-    while (len > 0) {
-        int n = net::raw_stdout(p, len);
-        if (n <= 0) break;
-        p += n;
-        len -= n;
-    }
-}
 
 static void udp_receiver(UdpSocket* sock) {
     char buf[65536];
@@ -31,15 +21,15 @@ static void udp_receiver(UdpSocket* sock) {
 
         if (n < 0) {
             if (!s_running) break;
-            continue;  // timeout, retry
+            continue;
         }
         if (n == 0) continue;
 
         {
-            std::lock_guard<std::mutex> lock(s_print_mutex);
+            std::lock_guard<std::mutex> lock(net::out_lock());
             fprintf(stdout, "\n[recv %s:%d %dB] ", from_ip, from_port, n);
             fflush(stdout);
-            raw_write_all(buf, n);
+            net::write_stdout(buf, n);
             fprintf(stdout, "\n> ");
             fflush(stdout);
         }
@@ -47,8 +37,6 @@ static void udp_receiver(UdpSocket* sock) {
 }
 
 int run_udp(int argc, char* argv[]) {
-    setvbuf(stdout, nullptr, _IONBF, 0);
-
     if (argc < 3) {
         fprintf(stderr, "Usage: net-helper -u <ip|domain> <port>\n");
         return 1;
@@ -74,7 +62,7 @@ int run_udp(int argc, char* argv[]) {
     std::string line;
     while (s_running) {
         {
-            std::lock_guard<std::mutex> lock(s_print_mutex);
+            std::lock_guard<std::mutex> lock(net::out_lock());
             fprintf(stdout, "> ");
             fflush(stdout);
         }

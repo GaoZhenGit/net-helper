@@ -1,4 +1,4 @@
-// mod_tcp.cpp — TCP client module implementation
+// mod_tcp.cpp — TCP client module
 #include "mod_tcp.h"
 #include "socket.h"
 #include "net_common.h"
@@ -10,17 +10,6 @@
 #include <mutex>
 
 static std::atomic<bool> s_running{true};
-static std::mutex s_print_mutex;
-
-// Write all bytes to stdout, retrying partial writes
-static void raw_write_all(const char* p, int len) {
-    while (len > 0) {
-        int n = net::raw_stdout(p, len);
-        if (n <= 0) break;
-        p += n;
-        len -= n;
-    }
-}
 
 static void tcp_receiver(TcpSocket* sock) {
     char buf[65536];
@@ -28,21 +17,21 @@ static void tcp_receiver(TcpSocket* sock) {
     while (s_running) {
         int n = sock->recv(buf, sizeof(buf) - 1);
 
-        if (n == -2) {                 // timeout
+        if (n == -2) {
             if (!s_running) break;
             continue;
         }
 
-        if (n < 0) {                   // connection lost (RST, etc.)
-            std::lock_guard<std::mutex> lock(s_print_mutex);
+        if (n < 0) {
+            std::lock_guard<std::mutex> lock(net::out_lock());
             fprintf(stdout, "\nConnection lost\n");
             fflush(stdout);
             s_running = false;
             break;
         }
 
-        if (n == 0) {                  // graceful close (FIN)
-            std::lock_guard<std::mutex> lock(s_print_mutex);
+        if (n == 0) {
+            std::lock_guard<std::mutex> lock(net::out_lock());
             fprintf(stdout, "\nConnection closed by remote\n");
             fflush(stdout);
             s_running = false;
@@ -50,10 +39,10 @@ static void tcp_receiver(TcpSocket* sock) {
         }
 
         {
-            std::lock_guard<std::mutex> lock(s_print_mutex);
+            std::lock_guard<std::mutex> lock(net::out_lock());
             fprintf(stdout, "\n[recv %d bytes] ", n);
             fflush(stdout);
-            raw_write_all(buf, n);
+            net::write_stdout(buf, n);
             fprintf(stdout, "\n> ");
             fflush(stdout);
         }
@@ -61,9 +50,6 @@ static void tcp_receiver(TcpSocket* sock) {
 }
 
 int run_tcp(int argc, char* argv[]) {
-    // Force unbuffered stdout for reliable console output
-    setvbuf(stdout, nullptr, _IONBF, 0);
-
     if (argc < 3) {
         fprintf(stderr, "Usage: net-helper -t <ip|domain> <port>\n");
         return 1;
@@ -89,7 +75,7 @@ int run_tcp(int argc, char* argv[]) {
     std::string line;
     while (s_running) {
         {
-            std::lock_guard<std::mutex> lock(s_print_mutex);
+            std::lock_guard<std::mutex> lock(net::out_lock());
             fprintf(stdout, "> ");
             fflush(stdout);
         }
