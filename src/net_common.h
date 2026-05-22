@@ -9,10 +9,20 @@
 #ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#include <io.h>
+namespace net {
+inline int raw_stdout(const void* buf, int len) { return _write(1, buf, len); }
+inline int raw_stderr(const void* buf, int len) { return _write(2, buf, len); }
+}
 #else
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <unistd.h>
+namespace net {
+inline int raw_stdout(const void* buf, int len) { return write(1, buf, len); }
+inline int raw_stderr(const void* buf, int len) { return write(2, buf, len); }
+}
 #endif
 
 namespace net {

@@ -1,5 +1,6 @@
 // main.cpp — net-helper entry point
 #include "mod_udp.h"
+#include "mod_tcp.h"
 #include "mod_dns.h"
 #include "version.h"
 #include <iostream>
@@ -9,6 +10,7 @@ static void print_usage() {
     std::cout << "net-helper - network diagnostic tool\n\n"
               << "Usage:\n"
               << "  net-helper -u <ip|domain> <port>   UDP send/receive\n"
+              << "  net-helper -t <ip|domain> <port>   TCP connect\n"
               << "  net-helper -d <domain>              DNS lookup\n"
               << "  net-helper -v, --version            Show version\n";
 }
@@ -23,6 +25,9 @@ int main(int argc, char* argv[]) {
 
     if (flag == "-u" || flag == "--udp")
         return run_udp(argc - 1, argv + 1);
+
+    if (flag == "-t" || flag == "--tcp")
+        return run_tcp(argc - 1, argv + 1);
 
     if (flag == "-d" || flag == "--dns")
         return run_dns(argc - 1, argv + 1);
