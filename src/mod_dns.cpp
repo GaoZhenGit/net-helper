@@ -17,9 +17,11 @@ int run_dns(int argc, char* argv[]) {
         return 1;
     }
 
-    std::cout << domain << ":" << std::endl;
-    for (const auto& ip : ips)
-        std::cout << "  " << ip << std::endl;
+    std::cout << domain << " (" << ips.size() << " record" << (ips.size() > 1 ? "s" : "") << "):" << std::endl;
+    for (const auto& ip : ips) {
+        bool is_ipv6 = (ip.find(':') != std::string::npos);
+        std::cout << "  " << (is_ipv6 ? "IPv6" : "IPv4") << "  " << ip << std::endl;
+    }
 
     return 0;
 }

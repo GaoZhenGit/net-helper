@@ -72,8 +72,10 @@ inline std::vector<std::string> resolve_hostname(const char* hostname) {
     hints.ai_family = AF_UNSPEC;     // both IPv4 and IPv6
     hints.ai_socktype = SOCK_STREAM;
 
-    if (getaddrinfo(hostname, nullptr, &hints, &res) != 0 || !res)
+    if (getaddrinfo(hostname, nullptr, &hints, &res) != 0 || !res) {
+        wsa_cleanup();
         return result;
+    }
 
     for (struct addrinfo* p = res; p; p = p->ai_next) {
         char ip_str[INET6_ADDRSTRLEN];
