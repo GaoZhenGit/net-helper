@@ -1,11 +1,16 @@
-use std::io::{stdin, stdout, Write, BufRead, BufReader, Read};
+use std::io::{Read, Write};
 use std::net::{TcpStream, ToSocketAddrs};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 
-use crate::put;
+use crate::{put, size_fmt, write_prefixed};
+
+enum Event {
+    Input(String),
+    Close,
+}
 
 fn connect_timeout(addr: std::net::SocketAddr, timeout: Duration) -> std::io::Result<TcpStream> {
     let (tx, rx) = mpsc::channel();
@@ -51,40 +56,59 @@ pub fn run(args: &[String]) -> i32 {
         }
     };
 
-    if stream.set_read_timeout(Some(Duration::from_millis(500))).is_err() {
-        eprintln!("Failed to set socket timeout");
-        return 1;
-    }
+    stream
+        .set_read_timeout(Some(Duration::from_millis(500)))
+        .ok();
 
     let running = std::sync::Arc::new(AtomicBool::new(true));
     let r = running.clone();
 
-    // Receiver thread
+    let (tx, rx) = mpsc::channel::<Event>();
+
+    // Stdin → Event adapter
+    let tx_input = tx.clone();
+    let stdin_rx = crate::input::reader();
+    thread::spawn(move || {
+        for line in stdin_rx {
+            if tx_input.send(Event::Input(line)).is_err() {
+                break;
+            }
+        }
+    });
+
     let mut rx_stream = stream.try_clone().expect("TcpStream::try_clone failed");
-    let recv = thread::spawn(move || {
+    let tx_close = tx;
+    thread::spawn(move || {
         let mut buf = [0u8; 65536];
         loop {
             match rx_stream.read(&mut buf) {
                 Ok(0) => {
-                    put(|o| writeln!(o, "\nConnection closed by remote"));
+                    put(|o| writeln!(o, "\r\x1b[2KConnection closed by remote"));
                     r.store(false, Ordering::SeqCst);
+                    let _ = tx_close.send(Event::Close);
                     break;
                 }
                 Ok(n) => {
                     put(|o| {
-                        write!(o, "\n[recv {} bytes] ", n)?;
-                        o.write_all(&buf[..n])?;
-                        write!(o, "\n> ")
+                        write!(o, "\r\x1b[2K[recv {}]", size_fmt(n))?;
+                        o.write_all(b"\n")?;
+                        write_prefixed(o, &buf[..n], "<- ")?;
+                        write!(o, "> ")
                     });
                 }
-                Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock
-                           || e.kind() == std::io::ErrorKind::TimedOut => {
-                    if !r.load(Ordering::SeqCst) { break; }
+                Err(ref e)
+                    if e.kind() == std::io::ErrorKind::WouldBlock
+                        || e.kind() == std::io::ErrorKind::TimedOut =>
+                {
+                    if !r.load(Ordering::SeqCst) {
+                        break;
+                    }
                     continue;
                 }
                 Err(_) => {
-                    put(|o| writeln!(o, "\nConnection lost"));
+                    put(|o| writeln!(o, "\r\x1b[2KConnection lost"));
                     r.store(false, Ordering::SeqCst);
+                    let _ = tx_close.send(Event::Close);
                     break;
                 }
             }
@@ -93,29 +117,39 @@ pub fn run(args: &[String]) -> i32 {
 
     println!("Connected to {} ({})", args[1], target_addr);
 
-    let stdin = BufReader::new(stdin());
-    for line in stdin.lines() {
-        put(|o| write!(o, "> "));
-        let line = match line {
-            Ok(l) => l,
-            Err(_) => break,
-        };
-        if !running.load(Ordering::SeqCst) { break; }
-        if line == "/quit" { break; }
+    put(|o| write!(o, "> "));
+    loop {
+        match rx.recv() {
+            Ok(Event::Input(line)) => {
+                if !running.load(Ordering::SeqCst) {
+                    break;
+                }
+                if line == "/quit" {
+                    break;
+                }
 
-        let mut data = line.into_bytes();
-        data.push(b'\n');
-        if let Err(_) = stream.write_all(&data) {
-            let _ = stdout().flush(); // ensure "> " is visible
-            eprintln!("Send failed");
-            running.store(false, Ordering::SeqCst);
-            break;
+                let mut data = line.into_bytes();
+                data.push(b'\n');
+
+                if let Err(_) = stream.write_all(&data) {
+                    eprintln!("Send failed");
+                    running.store(false, Ordering::SeqCst);
+                    break;
+                }
+                let len = data.len();
+                put(|o| {
+                    write!(o, "\r\x1b[2K[send {}]", size_fmt(len))?;
+                    o.write_all(b"\n")?;
+                    write_prefixed(o, &data, "-> ")?;
+                    write!(o, "> ")
+                });
+            }
+            Ok(Event::Close) => break,
+            Err(_) => break,
         }
     }
 
     running.store(false, Ordering::SeqCst);
     drop(stream);
-    recv.join().ok();
-
     0
 }
