@@ -83,7 +83,10 @@ pub fn poll(timeout: Duration) -> Option<String> {
 
 pub fn write(f: impl FnOnce(&mut dyn Write) -> std::io::Result<()>) {
     let _lock = OUT.lock().unwrap();
-    let prompt = STATE.lock().unwrap().buf.clone();
+    let st = STATE.lock().unwrap();
+    let prompt = st.buf.clone();
+    let pos = st.pos;
+    drop(st);
 
     let mut o = stdout();
     let _ = execute!(o, Clear(ClearType::CurrentLine), cursor::MoveToColumn(0));
@@ -93,6 +96,8 @@ pub fn write(f: impl FnOnce(&mut dyn Write) -> std::io::Result<()>) {
     let _ = o.flush();
 
     let _ = execute!(o, Print(format!("\r{}> {}", Clear(ClearType::CurrentLine), prompt)));
+    let col = (2 + pos) as u16;
+    let _ = execute!(o, cursor::MoveToColumn(col));
     let _ = o.flush();
 }
 
