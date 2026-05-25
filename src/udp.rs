@@ -61,5 +61,6 @@ pub fn run(args: &[String]) -> i32 {
 
     running.store(false, Ordering::SeqCst);
     drop(sock);
+    thread::sleep(Duration::from_millis(600));  // let receiver flush
     0
 }
