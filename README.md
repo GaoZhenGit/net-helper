@@ -1,19 +1,21 @@
 # net-helper
 
-A multi-function network diagnostic tool, like a portable cross-platform nc/nslookup combo.
+A multi-function network diagnostic tool — portable, static, zero-dependency.
 
 ## What it does
 
-- **UDP send/receive** — connect to any UDP server, send messages, see replies in real time. Supports both IP and domain name.
-- **DNS lookup** — query system DNS to see all resolved addresses with IPv4/IPv6 labels.
+- **UDP send/receive** — connect to any UDP server, send messages, see replies in real time
+- **TCP connect** — interact with TCP servers (HTTP, SMTP, telnet, etc.), full-duplex I/O
+- **DNS lookup** — resolve domains via system DNS, see all IPv4/IPv6 records
 
 ## Quick start
 
-Get the binary for your platform from the release page, or build it yourself (see below).
-
 ```bash
-# UDP mode — connect and chat
+# UDP chat
 net-helper -u example.com 2077
+
+# TCP — talk HTTP
+net-helper -t www.baidu.com 80
 
 # DNS lookup
 net-helper -d baidu.com
@@ -22,13 +24,14 @@ net-helper -d baidu.com
 net-helper --version
 ```
 
-In UDP mode, type your message and press Enter to send. Type `/quit` to exit.
+In UDP/TCP mode, type your message and press Enter to send. Type `/quit` to exit.
 
 ## Build from source
 
 **Prerequisites:**
-- Windows with [w64devkit](https://github.com/skeeto/w64devkit) (MinGW GCC, CMake, make)
-- [Zig](https://ziglang.org/download) 0.14+ (for Linux cross-compilation)
+- [Rust](https://rustup.rs) (stable)
+- [w64devkit](https://github.com/skeeto/w64devkit) (MinGW, for Windows target)
+- musl target: `rustup target add x86_64-unknown-linux-musl`
 
 **One command:**
 
@@ -37,8 +40,8 @@ In UDP mode, type your message and press Enter to send. Type `/quit` to exit.
 ```
 
 This produces:
-- `build-win\net-helper.exe` — Windows
-- `build-linux\net-helper` — Linux (musl, static)
+- `build-win\net-helper.exe` — Windows (1.3 MB)
+- `build-linux\net-helper` — Linux musl static (743 KB)
 
 To pin a specific version:
 
@@ -50,14 +53,15 @@ To pin a specific version:
 
 | Platform | Binary | Notes |
 |---|---|---|
-| Windows | `net-helper.exe` | Static link, no DLLs needed |
-| Linux | `net-helper` | musl libc, static link, runs on any kernel 2.6+ |
+| Windows | `net-helper.exe` | MinGW, static link |
+| Linux | `net-helper` | musl libc, static-pie, runs on any kernel |
 
-## Usage reference
+## Usage
 
 ```
 Usage:
   net-helper -u <ip|domain> <port>   UDP send/receive
+  net-helper -t <ip|domain> <port>   TCP connect
   net-helper -d <domain>              DNS lookup
   net-helper -v, --version            Show version
 ```

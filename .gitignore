@@ -1,2 +1,15 @@
+# Build output
 build-win/
 build-linux/
+target/
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+Desktop.ini
