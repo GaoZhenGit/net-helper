@@ -11,6 +11,16 @@ pub(crate) fn put(f: impl FnOnce(&mut dyn Write) -> std::io::Result<()>) {
     o.flush().unwrap();
 }
 
+/// Clear previous line: move up, CR, erase (sender: erases user input).
+pub(crate) fn clr_up() -> &'static str {
+    "\x1b[1A\r\x1b[2K"
+}
+
+/// Clear current line: CR, erase (receiver: erases `>` prompt).
+pub(crate) fn clr() -> &'static str {
+    "\r\x1b[2K"
+}
+
 pub(crate) fn size_fmt(n: usize) -> String {
     if n < 1024 {
         format!("{}b", n)
