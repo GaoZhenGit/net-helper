@@ -1,31 +1,33 @@
 # Build script for net-helper -- dual-platform (Windows + Linux musl)
-# Run from project root: .\build.ps1
-# Optional version override: .\build.ps1 v2026.12.31.1200
+# Run from project root: .\build.ps1 [-Clean] [version]
 
 $ErrorActionPreference = "Stop"
-$Root = Split-Path -Parent $MyInvocation.MyCommand.Path
+Set-Location (Split-Path -Parent $MyInvocation.MyCommand.Path)
 
-$Ver = $args[0]
-$env:NETHELPER_VERSION = if ($Ver -and $Ver -match '^v\d{4}') { $Ver } else { "" }
+$Clean = $args -contains '-Clean'
+$Ver  = ($args | Where-Object { $_ -match '^v\d{4}\.\d{2}\.\d{2}\.\d{4}$' } | Select-Object -First 1)
+if ($Ver) { $env:NETHELPER_VERSION = $Ver } else { $env:NETHELPER_VERSION = $null }
 
-Write-Host "=== Cleaning build directories ===" -ForegroundColor Cyan
-if (Test-Path "$Root\build-win")   { Remove-Item "$Root\build-win"   -Recurse -Force }
-if (Test-Path "$Root\build-linux") { Remove-Item "$Root\build-linux" -Recurse -Force }
+$winTarget  = "x86_64-pc-windows-gnu"
+$linuxTarget = "x86_64-unknown-linux-musl"
 
-Write-Host ""
-Write-Host "=== Building Windows (MinGW) ===" -ForegroundColor Cyan
-cargo build --release --target x86_64-pc-windows-gnu --manifest-path "$Root\Cargo.toml"
-New-Item -ItemType Directory -Force -Path "$Root\build-win" | Out-Null
-Copy-Item "$Root\target\x86_64-pc-windows-gnu\release\net-helper.exe" "$Root\build-win\net-helper.exe"
+if ($Clean) {
+    Write-Host "=== Cleaning project artifacts (keeping dependencies) ===" -ForegroundColor Cyan
+    cargo clean -p net-helper --release --target $winTarget
+    Write-Host "  Removed target\$winTarget\release\net-helper*"
+    cargo clean -p net-helper --release --target $linuxTarget
+    Write-Host "  Removed target\$linuxTarget\release\net-helper*"
+}
 
-Write-Host ""
-Write-Host "=== Building Linux (musl) ===" -ForegroundColor Cyan
-cargo build --release --target x86_64-unknown-linux-musl --manifest-path "$Root\Cargo.toml"
-New-Item -ItemType Directory -Force -Path "$Root\build-linux" | Out-Null
-Copy-Item "$Root\target\x86_64-unknown-linux-musl\release\net-helper" "$Root\build-linux\net-helper"
+Write-Host "`n=== Windows ===" -ForegroundColor Cyan
+cargo build --release --target $winTarget
+Copy-Item "target\$winTarget\release\net-helper.exe" "target\net-helper.exe" -Force
 
-Write-Host ""
-Write-Host "=== Done ===" -ForegroundColor Green
-Write-Host "Windows: build-win\net-helper.exe"
-Write-Host "Linux:   build-linux\net-helper"
+Write-Host "`n=== Linux (musl) ===" -ForegroundColor Cyan
+cargo zigbuild --release --target $linuxTarget
+Copy-Item "target\$linuxTarget\release\net-helper" "target\net-helper" -Force
+
+Write-Host "`n=== Done ===" -ForegroundColor Green
+Write-Host "target\net-helper.exe"
+Write-Host "target\net-helper"
 if ($Ver) { Write-Host "Version: $Ver" }

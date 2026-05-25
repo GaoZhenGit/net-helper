@@ -1,7 +1,7 @@
-use std::io::{Read, Write};
+use std::io::Write;
 use std::net::{TcpStream, ToSocketAddrs};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc;
+use std::sync::atomic::AtomicBool;
+use std::sync::{Arc, Mutex, mpsc};
 use std::thread;
 use std::time::Duration;
 
@@ -15,73 +15,59 @@ fn connect_timeout(addr: std::net::SocketAddr, timeout: Duration) -> std::io::Re
 }
 
 pub fn run(args: &[String]) -> i32 {
-    if args.len() < 3 {
-        eprintln!("Usage: net-helper -t <ip|domain> <port>");
+    let sub = &args[1..];
+    let tls = sub.iter().any(|a| a == "-tls" || a == "--tls");
+    let positional: Vec<&str> = sub.iter()
+        .map(|s| s.as_str())
+        .filter(|s| !s.starts_with('-'))
+        .collect();
+    if positional.len() < 2 {
+        eprintln!("Usage: net-helper -t [-tls] <ip|domain> <port>");
         return 1;
     }
+    let (host, port) = (positional[0], positional[1]);
 
-    let target_str = format!("{}:{}", args[1], args[2]);
-    let target_addr = match target_str.to_socket_addrs() {
-        Ok(mut i) => match i.next() {
-            Some(a) => a,
-            None => { eprintln!("Failed to resolve: {}", args[1]); return 1; }
-        },
-        Err(_) => { eprintln!("Failed to resolve: {}", args[1]); return 1; }
+    let addr = match format!("{}:{}", host, port).to_socket_addrs() {
+        Ok(mut i) => match i.next() { Some(a) => a, None => { eprintln!("Failed to resolve: {}", host); return 1; } },
+        Err(_) => { eprintln!("Failed to resolve: {}", host); return 1; }
+    };
+    let raw = match connect_timeout(addr, Duration::from_secs(5)) {
+        Ok(s) => s, Err(_) => { eprintln!("Failed to connect to {}:{}", host, port); return 1; }
     };
 
-    let mut stream = match connect_timeout(target_addr, Duration::from_secs(5)) {
-        Ok(s) => s,
-        Err(_) => { eprintln!("Failed to connect to {}:{}", args[1], args[2]); return 1; }
-    };
-    stream.set_read_timeout(Some(Duration::from_millis(500))).ok();
+    let running = Arc::new(AtomicBool::new(true));
 
-    let running = std::sync::Arc::new(AtomicBool::new(true));
-    let r = running.clone();
-
-    // Receiver → close signal via channel
-    let (close_tx, close_rx) = mpsc::channel::<()>();
-    let mut rx_stream = stream.try_clone().expect("TcpStream::try_clone failed");
-    thread::spawn(move || {
-        let mut buf = [0u8; 65536];
-        loop {
-            match rx_stream.read(&mut buf) {
-                Ok(0)  => {
-                    crate::console::status("Connection closed by remote");
-                    r.store(false, Ordering::SeqCst); let _ = close_tx.send(()); break;
-                }
-                Ok(n)  => crate::console::recv(&buf[..n]),
-                Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock
-                          || e.kind() == std::io::ErrorKind::TimedOut => {
-                    if !r.load(Ordering::SeqCst) { break; } continue;
-                }
-                Err(_) => {
-                    crate::console::status("Connection lost");
-                    r.store(false, Ordering::SeqCst); let _ = close_tx.send(()); break;
-                }
-            }
-        }
-    });
-
-    crate::console::println(&format!("Connected to {} ({})", args[1], target_addr));
-
-    loop {
-        if crate::console::quit_requested() { break; }
-        if let Some(line) = crate::console::poll(Duration::from_millis(200)) {
-            if !running.load(Ordering::SeqCst) { break; }
-            if line == "/quit" { break; }
-            let mut data = line.into_bytes();
-            data.push(b'\n');
-            if stream.write_all(&data).is_err() {
-                eprintln!("Send failed");
-                running.store(false, Ordering::SeqCst);
-                break;
-            }
-            crate::console::send(&data);
-        }
-        if close_rx.try_recv().is_ok() || !running.load(Ordering::SeqCst) { break; }
+    if tls {
+        let tls = match crate::tls::TlsStream::connect(raw, host, Duration::from_secs(10)) {
+            Ok(s) => s, Err(e) => { eprintln!("TLS handshake failed: {}", e); return 1; }
+        };
+        crate::console::println(&format!("Connected to {} ({}) [TLS]", host, addr));
+        // Arc<Mutex<>> for shared read/write
+        let stream = Arc::new(Mutex::new(tls));
+        let rx = Arc::clone(&stream);
+        let close_rx = crate::net::spawn_receiver(TlsReader(rx), &running);
+        crate::net::interactive(TlsWriter(stream), running, close_rx)
+    } else {
+        raw.set_read_timeout(Some(Duration::from_millis(500))).ok();
+        crate::console::println(&format!("Connected to {} ({})", host, addr));
+        let rx = raw.try_clone().expect("TcpStream::try_clone failed");
+        let close_rx = crate::net::spawn_receiver(rx, &running);
+        crate::net::interactive(raw, running, close_rx)
     }
+}
 
-    running.store(false, Ordering::SeqCst);
-    drop(stream);
-    0
+// ── TLS delegation wrappers (Arc<Mutex<TlsStream>> → Read / Write) ──
+
+use std::io::{Read, Result};
+use crate::tls::TlsStream;
+
+struct TlsReader(Arc<Mutex<TlsStream>>);
+struct TlsWriter(Arc<Mutex<TlsStream>>);
+
+impl Read for TlsReader {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize> { self.0.lock().unwrap().read(buf) }
+}
+impl Write for TlsWriter {
+    fn write(&mut self, buf: &[u8]) -> Result<usize> { self.0.lock().unwrap().write(buf) }
+    fn flush(&mut self) -> Result<()> { self.0.lock().unwrap().flush() }
 }
