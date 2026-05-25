@@ -1,9 +1,11 @@
-use std::io::Write;
+use std::io::{Read, Result, Write};
 use std::net::{TcpStream, ToSocketAddrs};
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex, mpsc};
 use std::thread;
 use std::time::Duration;
+
+use crate::tls::TlsStream;
 
 fn connect_timeout(addr: std::net::SocketAddr, timeout: Duration) -> std::io::Result<TcpStream> {
     let (tx, rx) = mpsc::channel();
@@ -38,7 +40,7 @@ pub fn run(args: &[String]) -> i32 {
     let running = Arc::new(AtomicBool::new(true));
 
     if tls {
-        let tls = match crate::tls::TlsStream::connect(raw, host, Duration::from_secs(10)) {
+        let tls = match crate::tls::TlsStream::connect(raw, host) {
             Ok(s) => s, Err(e) => { eprintln!("TLS handshake failed: {}", e); return 1; }
         };
         crate::console::println(&format!("Connected to {} ({}) [TLS]", host, addr));
@@ -56,10 +58,7 @@ pub fn run(args: &[String]) -> i32 {
     }
 }
 
-// ── TLS delegation wrappers (Arc<Mutex<TlsStream>> → Read / Write) ──
-
-use std::io::{Read, Result};
-use crate::tls::TlsStream;
+// ── TLS delegation wrappers ──
 
 struct TlsReader(Arc<Mutex<TlsStream>>);
 struct TlsWriter(Arc<Mutex<TlsStream>>);
