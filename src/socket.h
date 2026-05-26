@@ -20,6 +20,7 @@ inline void sock_close(socket_t fd) { closesocket(fd); }
 
 #else
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
