@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """net-helper automated test suite (pipe mode)."""
 
-import subprocess, sys, os, time
+import re, subprocess, sys, os, time
 
 if sys.platform == 'win32':
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
@@ -25,7 +25,7 @@ def trim(lines, n=5):
         return lines
     return lines[:n] + [f"    ... ({len(lines) - n*2} lines omitted) ..."] + lines[-n:]
 
-def test(name, args, stdin=None, must_contain=None, timeout=10):
+def test(name, args, stdin=None, must_contain=None, regex=None, timeout=10):
     global PASS, FAIL, SKIP
     cmd = [EXE] + args
     print(f"\n{'─'*50}\n  {name}\n  $ net-helper {' '.join(args)}")
@@ -68,11 +68,15 @@ def test(name, args, stdin=None, must_contain=None, timeout=10):
         if missed:
             print(f"  FAIL: not found: {missed}")
             FAIL += 1; return
+    if regex:
+        if not re.search(regex, out.strip()):
+            print(f"  FAIL: version mismatch: {out.strip()}")
+            FAIL += 1; return
     print("  PASS"); PASS += 1
 
 # ── info ──────────────────────────────────────────────
 
-test("Version",      ["--version"], must_contain="v2026")
+test("Version",      ["--version"], regex=r'^\d+\.\d+\.\d+\+\d{8}\.\d{4}$')
 test("Help",         ["-h"],        must_contain="Usage:")
 test("Unknown flag", ["--bogus"],   must_contain="Unknown")
 
