@@ -1,4 +1,5 @@
 use std::io::{Read, Write};
+use std::net::TcpStream;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, mpsc};
 use std::thread;
@@ -79,4 +80,14 @@ pub fn interactive<W: Write>(
     running.store(false, Ordering::SeqCst);
     drop(stream);
     0
+}
+
+/// Connect with a timeout via a spawned thread + channel.
+pub fn connect_timeout(addr: std::net::SocketAddr, timeout: Duration) -> std::io::Result<TcpStream> {
+    let (tx, rx) = mpsc::channel();
+    let a = addr;
+    thread::spawn(move || { let _ = tx.send(TcpStream::connect(a)); });
+    rx.recv_timeout(timeout)
+        .map_err(|_| std::io::Error::new(std::io::ErrorKind::TimedOut, "connect timed out"))
+        .and_then(|r| r)
 }

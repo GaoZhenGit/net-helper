@@ -1,20 +1,9 @@
 use std::io::{Read, Result, Write};
-use std::net::TcpStream;
 use std::sync::atomic::AtomicBool;
-use std::sync::{Arc, Mutex, mpsc};
-use std::thread;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use crate::tls::TlsStream;
-
-fn connect_timeout(addr: std::net::SocketAddr, timeout: Duration) -> std::io::Result<TcpStream> {
-    let (tx, rx) = mpsc::channel();
-    let a = addr;
-    thread::spawn(move || { let _ = tx.send(TcpStream::connect(a)); });
-    rx.recv_timeout(timeout)
-        .map_err(|_| std::io::Error::new(std::io::ErrorKind::TimedOut, "connect timed out"))
-        .and_then(|r| r)
-}
 
 pub fn run(args: &[String]) -> i32 {
     let sub = &args[1..];
@@ -29,12 +18,16 @@ pub fn run(args: &[String]) -> i32 {
     }
     let (host, port) = (positional[0], positional[1]);
 
+    let port_num: u16 = match port.parse() {
+        Ok(p) => p,
+        Err(_) => { eprintln!("Invalid port: {}", port); return 1; }
+    };
     let ipv6 = sub.iter().any(|a| a == "-ipv6" || a == "-6");
-    let addrs = crate::dns::resolve(host, port.parse().unwrap_or(0), ipv6);
+    let addrs = crate::dns::resolve(host, port_num, ipv6);
     if addrs.is_empty() { eprintln!("Failed to resolve: {}", host); return 1; }
     let mut raw = None;
     for addr in &addrs {
-        if let Ok(s) = connect_timeout(*addr, Duration::from_secs(2)) { raw = Some(s); break; }
+        if let Ok(s) = crate::net::connect_timeout(*addr, Duration::from_secs(2)) { raw = Some(s); break; }
     }
     let raw = match raw { Some(s) => s, None => { eprintln!("Failed to connect to {}:{}", host, port); return 1; } };
 

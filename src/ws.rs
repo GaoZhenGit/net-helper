@@ -11,16 +11,8 @@ use tungstenite::{Message, client::IntoClientRequest};
 
 // ── helpers ──────────────────────────────────────────────
 
-fn connect_timeout(a: std::net::SocketAddr, t: Duration) -> std::io::Result<TcpStream> {
-    let (tx, rx) = mpsc::channel();
-    thread::spawn(move || { let _ = tx.send(TcpStream::connect(a)); });
-    rx.recv_timeout(t)
-        .map_err(|_| std::io::Error::new(std::io::ErrorKind::TimedOut, "connect timed out"))
-        .and_then(|r| r)
-}
-
 fn loop_addrs(addrs: &[std::net::SocketAddr]) -> Option<TcpStream> {
-    for addr in addrs { if let Ok(s) = connect_timeout(*addr, Duration::from_secs(2)) { return Some(s); } }
+    for addr in addrs { if let Ok(s) = crate::net::connect_timeout(*addr, Duration::from_secs(2)) { return Some(s); } }
     None
 }
 
@@ -133,7 +125,10 @@ pub fn run(args: &[String]) -> i32 {
         Box::new(raw)
     };
     let handshake_url = format!("{}://{}:{}{}", if is_ssl {"wss"} else {"ws"}, host, port, path);
-    let req = handshake_url.as_str().into_client_request().unwrap();
+    let req = match handshake_url.as_str().into_client_request() {
+        Ok(r) => r,
+        Err(e) => { eprintln!("Invalid URL: {}", e); return 1; }
+    };
     let mut ws: Ws = match tungstenite::client(req, stream) { Ok((w,_)) => w, Err(e) => { eprintln!("{}", e); return 1; } };
 
     // Interactive loop

@@ -71,9 +71,10 @@ impl Write for TlsStream {
         self.conn.writer().write(buf)
     }
     fn flush(&mut self) -> io::Result<()> {
-        // Keep trying complete_io until WouldBlock
+        // Keep trying complete_io until nothing left or WouldBlock
         loop {
             match self.conn.complete_io(&mut self.sock) {
+                Ok((0, 0)) => break,
                 Ok(_) => continue,
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => break,
                 Err(e) => return Err(e),

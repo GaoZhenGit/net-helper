@@ -82,12 +82,10 @@ impl Term {
     pub fn write(&self, f: impl FnOnce(&mut dyn Write) -> std::io::Result<()>) {
         let (prompt, pos) = self.cursor_state();
         let mut o = stdout();
+        // 清除当前提示行，输出内容（可能多行），在输出结束后重绘提示
         let _ = execute!(o, Clear(ClearType::CurrentLine), cursor::MoveToColumn(0));
-        let _ = writeln!(o);
-        let _ = execute!(o, cursor::MoveUp(1), cursor::MoveToColumn(0));
         f(&mut o).unwrap_or(());
         let _ = o.flush();
-
         let _ = execute!(o, Print(format!("\r{}> {}", Clear(ClearType::CurrentLine), prompt)));
         let col = (2 + pos) as u16;
         let _ = execute!(o, cursor::MoveToColumn(col));
