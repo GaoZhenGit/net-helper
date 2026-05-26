@@ -1,21 +1,11 @@
+mod input;
+mod output;
 mod udp;
 mod tcp;
 mod dns;
 mod version;
 
-use std::io::{stdout, Write};
-use std::sync::Mutex;
-
-// Global lock for serialising multi-threaded console output
-pub(crate) static OUT: Mutex<()> = Mutex::new(());
-
-/// Write a complete message to stdout atomically (thread-safe), then flush.
-pub(crate) fn put(f: impl FnOnce(&mut dyn Write) -> std::io::Result<()>) {
-    let _lock = OUT.lock().unwrap();
-    let mut o = stdout();
-    f(&mut o).unwrap();
-    o.flush().unwrap();
-}
+pub(crate) use output::{put, size_fmt, write_prefixed};
 
 fn print_usage() {
     println!(
@@ -36,7 +26,7 @@ fn main() {
     }
 
     let flag = args[1].as_str();
-    let sub = &args[1..]; // argv[0] = flag, argv[1..] = real args
+    let sub = &args[1..];
 
     let code = match flag {
         "-u" | "--udp"     => udp::run(sub),
