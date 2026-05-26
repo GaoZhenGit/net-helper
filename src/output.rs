@@ -1,27 +1,23 @@
 use std::io::{stdout, Write};
 use std::sync::Mutex;
 
-pub(crate) static OUT: Mutex<()> = Mutex::new(());
+static OUT: Mutex<()> = Mutex::new(());
 
-/// Atomically write to stdout (mutex-protected), then flush.
-pub(crate) fn put(f: impl FnOnce(&mut dyn Write) -> std::io::Result<()>) {
-    let _lock = OUT.lock().unwrap();
+fn lock(f: impl FnOnce(&mut dyn Write) -> std::io::Result<()>) {
+    let _guard = OUT.lock().unwrap();
     let mut o = stdout();
     f(&mut o).unwrap();
     o.flush().unwrap();
 }
 
-/// Clear previous line: move up, CR, erase (sender: erases user input).
-pub(crate) fn clr_up() -> &'static str {
-    "\x1b[1A\r\x1b[2K"
-}
+// --- low-level ANSI helpers ---
 
-/// Clear current line: CR, erase (receiver: erases `>` prompt).
-pub(crate) fn clr() -> &'static str {
-    "\r\x1b[2K"
-}
+fn clr_up() -> &'static str { "\x1b[1A\r\x1b[2K" }  // clear previous line
+fn clr()    -> &'static str { "\r\x1b[2K" }          // clear current line
 
-pub(crate) fn size_fmt(n: usize) -> String {
+// --- size formatting ---
+
+fn size_fmt(n: usize) -> String {
     if n < 1024 {
         format!("{}b", n)
     } else if n < 1024 * 1024 {
@@ -31,8 +27,48 @@ pub(crate) fn size_fmt(n: usize) -> String {
     }
 }
 
-/// Write data line-by-line with a per-line prefix.
-pub(crate) fn write_prefixed(o: &mut dyn Write, data: &[u8], prefix: &str) -> std::io::Result<()> {
+// --- content output ---
+
+pub(crate) fn status(msg: &str) {
+    let s = msg.to_string();
+    lock(move |o| writeln!(o, "{}{s}", clr()))
+}
+
+pub(crate) fn prompt() {
+    lock(|o| write!(o, "> "))
+}
+
+pub(crate) fn send(data: &[u8]) {
+    let len = data.len();
+    lock(move |o| {
+        write!(o, "{}[send {}]\n", clr_up(), size_fmt(len))?;
+        write_prefixed(o, data, "-> ")?;
+        write!(o, "> ")
+    })
+}
+
+pub(crate) fn recv(data: &[u8]) {
+    let len = data.len();
+    lock(move |o| {
+        write!(o, "{}[recv {}]\n", clr(), size_fmt(len))?;
+        write_prefixed(o, data, "<- ")?;
+        write!(o, "> ")
+    })
+}
+
+pub(crate) fn recv_from(from: &str, data: &[u8]) {
+    let n = data.len();
+    let addr = from.to_string();
+    lock(move |o| {
+        write!(o, "{}[recv {} {}]\n", clr(), addr, size_fmt(n))?;
+        write_prefixed(o, data, "<- ")?;
+        write!(o, "> ")
+    })
+}
+
+// --- internal ---
+
+fn write_prefixed(o: &mut dyn Write, data: &[u8], prefix: &str) -> std::io::Result<()> {
     let pfx = prefix.as_bytes();
     let mut start = 0;
     for (i, &b) in data.iter().enumerate() {

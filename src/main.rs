@@ -5,8 +5,6 @@ mod tcp;
 mod dns;
 mod version;
 
-pub(crate) use output::{clr, clr_up, put, size_fmt, write_prefixed};
-
 fn print_usage() {
     println!(
         "net-helper - network diagnostic tool\n\
