@@ -3,6 +3,7 @@ mod net;
 mod tls;
 mod udp;
 mod tcp;
+mod ws;
 mod dns;
 mod version;
 
@@ -12,6 +13,7 @@ fn print_usage() {
          net-helper -u  <ip|domain> <port>   UDP send/receive\n  \
          net-helper -t  <ip|domain> <port>   TCP connect\n  \
          net-helper -t  -tls <ip|domain> <port>  TCP with TLS\n  \
+         net-helper -ws <ws://host[:port][/path]>   WebSocket\n  \
          net-helper -d  <domain>             DNS lookup\n  \
          net-helper -v, --version            Show version\n  \
          net-helper -h, --help               Show this help");
@@ -44,6 +46,8 @@ fn main() {
     let code = match flag {
         "-u" | "--udp" => udp::run(sub),
         "-t" | "--tcp" => tcp::run(sub),
+        "-ws" | "--ws" => ws::run(sub),
+        "-wss" | "--wss" => ws::run(sub),
         _ => {
             eprintln!("Unknown flag: {}", flag);
             print_usage();
