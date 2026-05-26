@@ -74,6 +74,8 @@ pub fn interactive<W: Write>(
             break;
         }
     }
+    // Wait for receiver to flush remaining data (or remote close)
+    let _ = close_rx.recv_timeout(Duration::from_secs(5));
     running.store(false, Ordering::SeqCst);
     drop(stream);
     0
