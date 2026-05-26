@@ -8,11 +8,10 @@
 #ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
-#pragma comment(lib, "ws2_32.lib")
 
 using socket_t = SOCKET;
 constexpr socket_t INVALID_SOCK = INVALID_SOCKET;
-#define SOCK_ERR SOCKET_ERROR
+constexpr int SOCK_ERR = SOCKET_ERROR;
 
 inline int sock_errno() { return WSAGetLastError(); }
 inline bool would_block() { return WSAGetLastError() == WSAETIMEDOUT; }
@@ -28,7 +27,7 @@ inline void sock_close(socket_t fd) { closesocket(fd); }
 
 using socket_t = int;
 constexpr socket_t INVALID_SOCK = -1;
-#define SOCK_ERR (-1)
+constexpr int SOCK_ERR = -1;
 
 inline int sock_errno() { return errno; }
 inline bool would_block() { return errno == EAGAIN || errno == EWOULDBLOCK; }

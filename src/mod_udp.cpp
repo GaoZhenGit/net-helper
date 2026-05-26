@@ -1,7 +1,6 @@
 // mod_udp.cpp — UDP communication module implementation
 #include "mod_udp.h"
 #include "socket.h"
-#include "net_common.h"
 #include <iostream>
 #include <string>
 #include <thread>
