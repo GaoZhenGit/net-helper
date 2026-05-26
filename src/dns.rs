@@ -1,4 +1,12 @@
-use std::net::ToSocketAddrs;
+use std::net::{SocketAddr, ToSocketAddrs};
+
+pub fn resolve(host: &str, port: u16, ipv6: bool) -> Vec<SocketAddr> {
+    let addrs: Vec<_> = match format!("{}:{}", host, port).to_socket_addrs() {
+        Ok(i) => i.collect(),
+        Err(_) => return vec![],
+    };
+    if ipv6 { addrs } else { addrs.into_iter().filter(|a| a.ip().is_ipv4()).collect() }
+}
 
 pub fn run(args: &[String]) -> i32 {
     if args.len() < 2 {
