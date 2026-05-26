@@ -5,7 +5,7 @@ $ErrorActionPreference = "Stop"
 Set-Location (Split-Path -Parent $MyInvocation.MyCommand.Path)
 
 $Clean = $args -contains '-Clean'
-$Ver  = ($args | Where-Object { $_ -match '^v\d{4}\.\d{2}\.\d{2}\.\d{4}$' } | Select-Object -First 1)
+$Ver  = ($args | Where-Object { $_ -match '^(v?\d+\.\d+\.\d+|v\d{4}\.\d{2}\.\d{2}\.\d{4})$' } | Select-Object -First 1)
 if ($Ver) { $env:NETHELPER_VERSION = $Ver } else { $env:NETHELPER_VERSION = $null }
 
 $winTarget  = "x86_64-pc-windows-gnu"

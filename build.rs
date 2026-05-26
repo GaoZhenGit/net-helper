@@ -43,7 +43,7 @@ fn format_time_utc8() -> String {
     }
     let day = remaining + 1;
 
-    format!("v{:04}.{:02}.{:02}.{:02}{:02}", year, month, day, hours, minutes)
+    format!("{:04}{:02}{:02}.{:02}{:02}", year, month, day, hours, minutes)
 }
 
 fn main() {
@@ -51,7 +51,9 @@ fn main() {
     let version = std::env::var("NETHELPER_VERSION")
         .ok()
         .filter(|v| !v.is_empty())
-        .unwrap_or_else(format_time_utc8);
+        .unwrap_or_else(|| {
+            format!("{}+{}", env!("CARGO_PKG_VERSION"), format_time_utc8())
+        });
 
     println!("cargo:rustc-env=NETHELPER_VERSION={}", version);
     // Always regenerate — version changes with time
