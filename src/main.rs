@@ -47,7 +47,6 @@ fn main() {
         "-u" | "--udp" => udp::run(sub),
         "-t" | "--tcp" => tcp::run(sub),
         "-ws" | "--ws" => ws::run(sub),
-        "-wss" | "--wss" => ws::run(sub),
         _ => {
             eprintln!("Unknown flag: {}", flag);
             print_usage();

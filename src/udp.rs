@@ -14,7 +14,10 @@ pub fn run(args: &[String]) -> i32 {
     }
 
     let (host, port_str) = (positional[0], positional[1]);
-    let port: u16 = port_str.parse().unwrap_or(0);
+    let port: u16 = match port_str.parse() {
+        Ok(p) => p,
+        Err(_) => { eprintln!("Invalid port: {}", port_str); return 1; }
+    };
     let ipv6 = args.iter().any(|a| a == "-ipv6" || a == "-6");
     let addrs = crate::dns::resolve(host, port, ipv6);
     let target_addr = match addrs.first() {
@@ -22,7 +25,8 @@ pub fn run(args: &[String]) -> i32 {
         None => { eprintln!("Failed to resolve: {}", host); return 1; }
     };
 
-    let sock = match UdpSocket::bind("0.0.0.0:0") {
+    let bind_addr = if target_addr.is_ipv4() { "0.0.0.0:0" } else { "[::]:0" };
+    let sock = match UdpSocket::bind(bind_addr) {
         Ok(s) => s,
         Err(_) => { eprintln!("Failed to create UDP socket"); return 1; }
     };
