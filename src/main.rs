@@ -1,19 +1,16 @@
-mod input;
-mod output;
+mod console;
 mod udp;
 mod tcp;
 mod dns;
 mod version;
 
 fn print_usage() {
-    println!(
-        "net-helper - network diagnostic tool\n\
+    println!("net-helper - network diagnostic tool\n\
          \nUsage:\n  \
          net-helper -u <ip|domain> <port>   UDP send/receive\n  \
          net-helper -t <ip|domain> <port>   TCP connect\n  \
          net-helper -d <domain>              DNS lookup\n  \
-         net-helper -v, --version            Show version"
-    );
+         net-helper -v, --version            Show version");
 }
 
 fn main() {
@@ -26,11 +23,20 @@ fn main() {
     let flag = args[1].as_str();
     let sub = &args[1..];
 
+    // DNS / version don't need raw terminal
+    if flag == "-d" || flag == "--dns" {
+        std::process::exit(dns::run(sub));
+    }
+    if flag == "-v" || flag == "--version" {
+        version::print();
+        std::process::exit(0);
+    }
+
+    console::init();
+
     let code = match flag {
-        "-u" | "--udp"     => udp::run(sub),
-        "-t" | "--tcp"     => tcp::run(sub),
-        "-d" | "--dns"     => dns::run(sub),
-        "-v" | "--version" => { version::print(); 0 }
+        "-u" | "--udp" => udp::run(sub),
+        "-t" | "--tcp" => tcp::run(sub),
         _ => {
             eprintln!("Unknown flag: {}", flag);
             print_usage();
@@ -38,5 +44,6 @@ fn main() {
         }
     };
 
+    console::cleanup();
     std::process::exit(code);
 }
