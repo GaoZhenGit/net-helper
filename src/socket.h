@@ -25,6 +25,8 @@ inline void sock_close(socket_t fd) { closesocket(fd); }
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <sys/select.h>
 
 using socket_t = int;
 constexpr socket_t INVALID_SOCK = -1;
@@ -140,5 +142,95 @@ public:
         if (from_port)
             *from_port = static_cast<int>(ntohs(from.sin_port));
         return n;
+    }
+};
+
+// TCP Socket
+class TcpSocket : public Socket {
+public:
+    // Connect to ip:port with timeout (seconds)
+    bool connect(const char* ip, int port, int timeout_sec = 5) {
+        if (!create(AF_INET, SOCK_STREAM, 0))
+            return false;
+
+        struct sockaddr_in addr;
+        std::memset(&addr, 0, sizeof(addr));
+        addr.sin_family = AF_INET;
+        addr.sin_port = htons(static_cast<uint16_t>(port));
+        inet_pton(AF_INET, ip, &addr.sin_addr);
+
+        // Non-blocking connect with timeout
+        set_nonblocking(true);
+
+        int ret = ::connect(fd_, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr));
+        if (ret == SOCK_ERR) {
+#ifdef _WIN32
+            if (WSAGetLastError() != WSAEWOULDBLOCK) { close(); return false; }
+#else
+            if (errno != EINPROGRESS) { close(); return false; }
+#endif
+            fd_set wfds;
+            FD_ZERO(&wfds);
+            FD_SET(fd_, &wfds);
+            struct timeval tv;
+            tv.tv_sec = timeout_sec;
+            tv.tv_usec = 0;
+
+            ret = select(static_cast<int>(fd_ + 1), nullptr, &wfds, nullptr, &tv);
+            if (ret <= 0) { close(); return false; }
+        }
+
+        set_nonblocking(false);
+        set_recv_timeout(500);
+        return true;
+    }
+
+    // Send all data, false on failure
+    bool send(const void* data, int len) {
+        const char* p = static_cast<const char*>(data);
+        int remaining = len;
+        while (remaining > 0) {
+            int n = ::send(fd_, p, remaining, 0);
+            if (n == SOCK_ERR) return false;
+            p += n;
+            remaining -= n;
+        }
+        return true;
+    }
+
+    // Receive data: >0 bytes, 0 closed, -2 timeout, -1 error
+    int recv(void* buf, int len) {
+        int n = ::recv(fd_, static_cast<char*>(buf), len, 0);
+        if (n == SOCK_ERR) {
+            if (would_block()) return -2;  // timeout, non-fatal
+            return -1;                     // connection lost
+        }
+        return n;
+    }
+
+private:
+    void set_nonblocking(bool on) {
+#ifdef _WIN32
+        u_long mode = on ? 1 : 0;
+        ioctlsocket(fd_, FIONBIO, &mode);
+#else
+        int flags = fcntl(fd_, F_GETFL, 0);
+        if (on)
+            fcntl(fd_, F_SETFL, flags | O_NONBLOCK);
+        else
+            fcntl(fd_, F_SETFL, flags & ~O_NONBLOCK);
+#endif
+    }
+
+    void set_recv_timeout(int ms) {
+#ifdef _WIN32
+        int to = ms;
+        setsockopt(fd_, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&to), sizeof(to));
+#else
+        struct timeval tv;
+        tv.tv_sec = ms / 1000;
+        tv.tv_usec = (ms % 1000) * 1000;
+        setsockopt(fd_, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+#endif
     }
 };
