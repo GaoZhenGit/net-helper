@@ -54,8 +54,15 @@ impl TlsStream {
 
 impl Read for TlsStream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.conn.complete_io(&mut self.sock)?;
-        self.conn.reader().read(buf)
+        match self.conn.complete_io(&mut self.sock) {
+            Ok(_) => {},
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {},
+            Err(e) => return Err(e),
+        }
+        match self.conn.reader().read(buf) {
+            Ok(0) => Err(io::Error::new(io::ErrorKind::WouldBlock, "no data available")),
+            other => other,
+        }
     }
 }
 

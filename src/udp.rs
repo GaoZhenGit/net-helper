@@ -4,17 +4,22 @@ use std::thread;
 use std::time::Duration;
 
 pub fn run(args: &[String]) -> i32 {
-    if args.len() < 3 {
+    let positional: Vec<&str> = args.iter()
+        .map(|s| s.as_str())
+        .filter(|s| !s.starts_with('-'))
+        .collect();
+    if positional.len() < 2 {
         eprintln!("Usage: net-helper -u <ip|domain> <port>");
         return 1;
     }
 
-    let port: u16 = args[2].parse().unwrap_or(0);
+    let (host, port_str) = (positional[0], positional[1]);
+    let port: u16 = port_str.parse().unwrap_or(0);
     let ipv6 = args.iter().any(|a| a == "-ipv6" || a == "-6");
-    let addrs = crate::dns::resolve(&args[1], port, ipv6);
+    let addrs = crate::dns::resolve(host, port, ipv6);
     let target_addr = match addrs.first() {
         Some(a) => *a,
-        None => { eprintln!("Failed to resolve: {}", args[1]); return 1; }
+        None => { eprintln!("Failed to resolve: {}", host); return 1; }
     };
 
     let sock = match UdpSocket::bind("0.0.0.0:0") {
@@ -41,7 +46,7 @@ pub fn run(args: &[String]) -> i32 {
         }
     });
 
-    crate::console::println(&format!("UDP connected to {} ({})", args[1], target_addr));
+    crate::console::println(&format!("UDP connected to {} ({})", host, target_addr));
 
     loop {
         if crate::console::quit_requested() || crate::console::eof() { break; }

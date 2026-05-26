@@ -1,2 +1,0 @@
-// Fix 1: use explicit types in Permissive verifier
-sed -i 's/_: &ServerName/_server_name: \&ServerName/; s/_: &_/_end_entity: \&CertificateDer/; s/_: &_/_intermediates: \&[CertificateDer]/' src/ws.rs

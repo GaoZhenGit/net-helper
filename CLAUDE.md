@@ -22,7 +22,8 @@ src/
 ├── tls.rs            # TLS 连接 (rustls + webpki-roots)
 ├── tcp.rs            # TCP 模块（含 -tls 标志）
 ├── udp.rs            # UDP 模块
-├── dns.rs            # DNS 模块
+├── ws.rs             # WebSocket 模块（-ws，含 WSS + 证书降级）
+├── dns.rs            # DNS 模块（含 resolve() 供其他模块复用）
 └── version.rs        # 版本号输出
 
 tests/
@@ -31,10 +32,12 @@ tests/
 - `console` 模块通过 `std::io::IsTerminal` 自动检测管道/终端，提供统一的 `poll`/`send`/`recv`/`status` API
 - `net.rs` 的 `spawn_receiver` 和 `interactive` 接受任何 `Read + Write`，TCP/TLS/后续模块复用
 - `tls.rs` 完全独立，其他模块可直接调用 `TlsStream::connect(sock, domain)`
+- `dns.rs` 提供 `resolve(host, port, ipv6)` 统一 DNS 解析，默认 IPv4，`-ipv6` 开启双栈
+- `ws.rs` 的 `tls_connect` 内置证书降级逻辑：默认验证 → 失败则重连 + permissive verifier
 
 ## CLI 风格
-Netcat 风格 flat flags：`-u`/`--udp`、`-t`/`--tcp`、`-tls`、`-d`/`--dns`、`-v`/`--version`、`-h`/`--help`。
-main.rs 只做 match 分发，模块内部自行校验参数。
+Netcat 风格 flat flags：`-u`/`--udp`、`-t`/`--tcp`、`-tls`、`-ws`/`--ws`、`-d`/`--dns`、`-v`/`--version`、`-h`/`--help`。
+全局参数：`-ipv6`/`-6`（IPv6 解析）。main.rs 只做 match 分发，模块内部自行校验参数。
 
 ## 构建
 ```powershell
