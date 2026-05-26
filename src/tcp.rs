@@ -5,7 +5,7 @@ use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 
-use crate::{put, size_fmt, write_prefixed};
+use crate::{clr, clr_up, put, size_fmt, write_prefixed};
 
 enum Event {
     Input(String),
@@ -83,14 +83,14 @@ pub fn run(args: &[String]) -> i32 {
         loop {
             match rx_stream.read(&mut buf) {
                 Ok(0) => {
-                    put(|o| writeln!(o, "\r\x1b[2KConnection closed by remote"));
+                    put(|o| writeln!(o, "{}Connection closed by remote", clr()));
                     r.store(false, Ordering::SeqCst);
                     let _ = tx_close.send(Event::Close);
                     break;
                 }
                 Ok(n) => {
                     put(|o| {
-                        write!(o, "\r\x1b[2K[recv {}]", size_fmt(n))?;
+                        write!(o, "{}[recv {}]", clr(), size_fmt(n))?;
                         o.write_all(b"\n")?;
                         write_prefixed(o, &buf[..n], "<- ")?;
                         write!(o, "> ")
@@ -106,7 +106,7 @@ pub fn run(args: &[String]) -> i32 {
                     continue;
                 }
                 Err(_) => {
-                    put(|o| writeln!(o, "\r\x1b[2KConnection lost"));
+                    put(|o| writeln!(o, "{}Connection lost", clr()));
                     r.store(false, Ordering::SeqCst);
                     let _ = tx_close.send(Event::Close);
                     break;
@@ -138,7 +138,7 @@ pub fn run(args: &[String]) -> i32 {
                 }
                 let len = data.len();
                 put(|o| {
-                    write!(o, "\r\x1b[2K[send {}]", size_fmt(len))?;
+                    write!(o, "{}[send {}]", clr_up(), size_fmt(len))?;
                     o.write_all(b"\n")?;
                     write_prefixed(o, &data, "-> ")?;
                     write!(o, "> ")

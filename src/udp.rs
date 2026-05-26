@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::Duration;
 
-use crate::{put, size_fmt, write_prefixed};
+use crate::{clr, clr_up, put, size_fmt, write_prefixed};
 
 pub fn run(args: &[String]) -> i32 {
     if args.len() < 3 {
@@ -49,7 +49,7 @@ pub fn run(args: &[String]) -> i32 {
             match rx_sock.recv_from(&mut buf) {
                 Ok((n, from)) => {
                     put(|o| {
-                        write!(o, "\r\x1b[2K[recv {} {}]", from, size_fmt(n))?;
+                        write!(o, "{}[recv {} {}]", clr(), from, size_fmt(n))?;
                         o.write_all(b"\n")?;
                         write_prefixed(o, &buf[..n], "<- ")?;
                         write!(o, "> ")
@@ -95,7 +95,7 @@ pub fn run(args: &[String]) -> i32 {
                 } else {
                     let len = data.len();
                     put(|o| {
-                        write!(o, "\r\x1b[2K[send {}]", size_fmt(len))?;
+                        write!(o, "{}[send {}]", clr_up(), size_fmt(len))?;
                         o.write_all(b"\n")?;
                         write_prefixed(o, data, "-> ")?;
                         write!(o, "> ")
