@@ -7,7 +7,7 @@
 - **语言**: Rust (edition 2021)
 - **构建系统**: Cargo
 - **Windows 链接器**: MinGW GCC 12.1.0 (w64devkit) / rust-lld
-- **Linux 交叉编译**: rust-lld + musl target
+- **Linux 交叉编译**: cargo-zigbuild + musl target
 - **平台**: 跨平台（Windows/Linux/macOS），零 `#[cfg]` 条件编译
 
 ## 工程结构
@@ -21,7 +21,6 @@ src/
 
 build.rs          # 构建时生成版本号（时间戳 / 环境变量覆盖）
 build.ps1         # 一键双平台构建脚本
-.cargo/config.toml # musl target 链接器配置
 ```
 - `main.rs` 中的 `OUT` (Mutex) 和 `put()` 供各模块共享，序列化多线程控制台输出
 - 每模块暴露 `pub fn run(args: &[String]) -> i32` 入口

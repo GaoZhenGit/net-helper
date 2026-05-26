@@ -1,6 +1,3 @@
-# Build output
-build-win/
-build-linux/
 target/
 
 # IDE
