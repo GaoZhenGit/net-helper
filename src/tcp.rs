@@ -1,5 +1,5 @@
 use std::io::{Read, Result, Write};
-use std::net::{TcpStream, ToSocketAddrs};
+use std::net::TcpStream;
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex, mpsc};
 use std::thread;
@@ -29,13 +29,14 @@ pub fn run(args: &[String]) -> i32 {
     }
     let (host, port) = (positional[0], positional[1]);
 
-    let addr = match format!("{}:{}", host, port).to_socket_addrs() {
-        Ok(mut i) => match i.next() { Some(a) => a, None => { eprintln!("Failed to resolve: {}", host); return 1; } },
-        Err(_) => { eprintln!("Failed to resolve: {}", host); return 1; }
-    };
-    let raw = match connect_timeout(addr, Duration::from_secs(5)) {
-        Ok(s) => s, Err(_) => { eprintln!("Failed to connect to {}:{}", host, port); return 1; }
-    };
+    let ipv6 = sub.iter().any(|a| a == "-ipv6" || a == "-6");
+    let addrs = crate::dns::resolve(host, port.parse().unwrap_or(0), ipv6);
+    if addrs.is_empty() { eprintln!("Failed to resolve: {}", host); return 1; }
+    let mut raw = None;
+    for addr in &addrs {
+        if let Ok(s) = connect_timeout(*addr, Duration::from_secs(2)) { raw = Some(s); break; }
+    }
+    let raw = match raw { Some(s) => s, None => { eprintln!("Failed to connect to {}:{}", host, port); return 1; } };
 
     let running = Arc::new(AtomicBool::new(true));
 
@@ -43,7 +44,7 @@ pub fn run(args: &[String]) -> i32 {
         let tls = match crate::tls::TlsStream::connect(raw, host) {
             Ok(s) => s, Err(e) => { eprintln!("TLS handshake failed: {}", e); return 1; }
         };
-        crate::console::println(&format!("Connected to {} ({}) [TLS]", host, addr));
+        crate::console::println(&format!("Connected to {} ({}:{}) [TLS]", host, host, port));
         // Arc<Mutex<>> for shared read/write
         let stream = Arc::new(Mutex::new(tls));
         let rx = Arc::clone(&stream);
@@ -51,7 +52,7 @@ pub fn run(args: &[String]) -> i32 {
         crate::net::interactive(TlsWriter(stream), running, close_rx)
     } else {
         raw.set_read_timeout(Some(Duration::from_millis(500))).ok();
-        crate::console::println(&format!("Connected to {} ({})", host, addr));
+        crate::console::println(&format!("Connected to {}:{})", host, port));
         let rx = raw.try_clone().expect("TcpStream::try_clone failed");
         let close_rx = crate::net::spawn_receiver(rx, &running);
         crate::net::interactive(raw, running, close_rx)

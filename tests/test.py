@@ -1,14 +1,24 @@
 #!/usr/bin/env python3
 """net-helper automated test suite (pipe mode)."""
 
-import subprocess, sys, os
+import subprocess, sys, os, time
 
 if sys.platform == 'win32':
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
 EXE = os.path.join(os.path.dirname(__file__), "..", "target",
                    "x86_64-pc-windows-gnu", "release", "net-helper.exe")
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PASS = FAIL = SKIP = 0
+
+def start_ws_server():
+    subprocess.run([sys.executable, os.path.join(SCRIPT_DIR, "ws_echo.py"), "start"],
+                   capture_output=True, timeout=10)
+    time.sleep(3)
+
+def stop_ws_server():
+    subprocess.run([sys.executable, os.path.join(SCRIPT_DIR, "ws_echo.py"), "stop"],
+                   capture_output=True, timeout=5)
 
 def trim(lines, n=5):
     if len(lines) <= n * 2 + 1:
@@ -17,9 +27,9 @@ def trim(lines, n=5):
 
 def test(name, args, stdin=None, must_contain=None, timeout=10):
     global PASS, FAIL, SKIP
-    print(f"\n{'─'*50}\n  {name}")
-
     cmd = [EXE] + args
+    print(f"\n{'─'*50}\n  {name}\n  $ net-helper {' '.join(args)}")
+
     inp = stdin.encode() if stdin else None
     try:
         r = subprocess.run(cmd, input=inp, capture_output=True, timeout=timeout)
@@ -75,7 +85,7 @@ test("DNS no args",   ["-d"],             must_contain="Usage:")
 
 test("UDP", ["-u", "202.108.144.21", "2077"],
     stdin="usee-test\n/quit",
-    must_contain=["[send", "[recv", "usee-test"], timeout=8)
+    must_contain=["[send", "[recv", "usee-test"], timeout=10)
 
 # ── TCP ───────────────────────────────────────────────
 
@@ -92,6 +102,24 @@ test("TCP EOF", ["-t", "example.com", "80"],
 tls = "GET / HTTP/1.1\nHost: www.baidu.com\n\n/quit"
 test("TCP TLS", ["-t", "-tls", "www.baidu.com", "443"],
     stdin=tls, must_contain=["TLS]", "[send", "[recv", "200 OK"], timeout=15)
+
+# ── WebSocket ──────────────────────────────────────────
+
+start_ws_server()
+
+test("WS local", ["-ws", "ws://127.0.0.1:9001/echo"],
+    stdin="hello\n",
+    must_contain=["[send", "[recv", "[received]", "hello ws"], timeout=12)
+
+test("WSS local", ["-ws", "wss://127.0.0.1:9002/echo"],
+    stdin="hello\n",
+    must_contain=["[send", "[recv", "[received]", "hello ws"], timeout=12)
+
+test("WSS public", ["-ws", "wss://ws.vi-server.org/mirror"],
+    stdin="hello\n",
+    must_contain=["[send", "[recv"], timeout=15)
+
+stop_ws_server()
 
 # ── summary ───────────────────────────────────────────
 
