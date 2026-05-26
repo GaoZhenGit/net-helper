@@ -10,7 +10,7 @@ pub struct TlsStream {
 }
 
 impl TlsStream {
-    pub fn connect(mut sock: TcpStream, domain: &str, _timeout: Duration) -> io::Result<Self> {
+    pub fn connect(mut sock: TcpStream, domain: &str) -> io::Result<Self> {
         let mut roots = RootCertStore::empty();
         roots.roots = webpki_roots::TLS_SERVER_ROOTS.iter().map(|a| a.to_owned()).collect();
 

@@ -51,7 +51,7 @@ pub fn interactive<W: Write>(
     close_rx: mpsc::Receiver<()>,
 ) -> i32 {
     loop {
-        if crate::console::quit_requested() {
+        if crate::console::quit_requested() || crate::console::eof() {
             break;
         }
         if let Some(line) = crate::console::poll(Duration::from_millis(200)) {
@@ -64,7 +64,7 @@ pub fn interactive<W: Write>(
             let mut data = line.into_bytes();
             data.push(b'\n');
             if stream.write_all(&data).is_err() || stream.flush().is_err() {
-                eprintln!("Send failed");
+                crate::console::status("Send failed");
                 running.store(false, Ordering::SeqCst);
                 break;
             }

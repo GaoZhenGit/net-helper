@@ -45,7 +45,7 @@ pub fn run(args: &[String]) -> i32 {
     crate::console::println(&format!("UDP connected to {} ({})", args[1], target_addr));
 
     loop {
-        if crate::console::quit_requested() { break; }
+        if crate::console::quit_requested() || crate::console::eof() { break; }
         if let Some(line) = crate::console::poll(Duration::from_millis(200)) {
             if !running.load(Ordering::SeqCst) { break; }
             if line == "/quit" { break; }
