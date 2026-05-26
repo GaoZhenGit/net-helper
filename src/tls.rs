@@ -10,6 +10,7 @@ pub struct TlsStream {
 }
 
 impl TlsStream {
+
     pub fn connect(mut sock: TcpStream, domain: &str) -> io::Result<Self> {
         let mut roots = RootCertStore::empty();
         roots.roots = webpki_roots::TLS_SERVER_ROOTS.iter().map(|a| a.to_owned()).collect();
@@ -43,8 +44,12 @@ impl TlsStream {
             }
         }
         // Stay non-blocking for fast read/write
-        Ok(Self { conn, sock })
+        let mut this = Self { conn, sock };
+        // Drain any post-handshake data
+        let _ = this.conn.complete_io(&mut this.sock);
+        Ok(this)
     }
+
 }
 
 impl Read for TlsStream {
