@@ -3,19 +3,21 @@
 #include "mod_tcp.h"
 #include "mod_dns.h"
 #include "version.h"
+#include <cstdio>
 #include <iostream>
-#include <cstring>
 
 static void print_usage() {
-    std::cout << "net-helper - network diagnostic tool\n\n"
-              << "Usage:\n"
-              << "  net-helper -u <ip|domain> <port>   UDP send/receive\n"
-              << "  net-helper -t <ip|domain> <port>   TCP connect\n"
-              << "  net-helper -d <domain>              DNS lookup\n"
-              << "  net-helper -v, --version            Show version\n";
+    fprintf(stdout, "net-helper - network diagnostic tool\n\n"
+                    "Usage:\n"
+                    "  net-helper -u <ip|domain> <port>   UDP send/receive\n"
+                    "  net-helper -t <ip|domain> <port>   TCP connect\n"
+                    "  net-helper -d <domain>              DNS lookup\n"
+                    "  net-helper -v, --version            Show version\n");
 }
 
 int main(int argc, char* argv[]) {
+    setvbuf(stdout, nullptr, _IONBF, 0);
+
     if (argc < 2) {
         print_usage();
         return 1;
@@ -37,7 +39,7 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
-    std::cerr << "Unknown flag: " << flag << std::endl;
+    fprintf(stderr, "Unknown flag: %s\n", flag.c_str());
     print_usage();
     return 1;
 }
