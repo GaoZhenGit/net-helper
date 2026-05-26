@@ -5,16 +5,21 @@ pub fn resolve(host: &str, port: u16, ipv6: bool) -> Vec<SocketAddr> {
         Ok(i) => i.collect(),
         Err(_) => return vec![],
     };
-    if ipv6 { addrs } else { addrs.into_iter().filter(|a| a.ip().is_ipv4()).collect() }
+    let is_ip_literal = host.parse::<std::net::IpAddr>().is_ok();
+    if ipv6 || is_ip_literal { addrs } else { addrs.into_iter().filter(|a| a.ip().is_ipv4()).collect() }
 }
 
 pub fn run(args: &[String]) -> i32 {
-    if args.len() < 2 {
+    let positional: Vec<&str> = args.iter()
+        .map(|s| s.as_str())
+        .filter(|s| !s.starts_with('-'))
+        .collect();
+    if positional.len() < 1 {
         eprintln!("Usage: net-helper -d <domain>");
         return 1;
     }
 
-    let domain = &args[1];
+    let domain = positional[0];
     let addr_str = format!("{}:0", domain);
 
     let addrs = match addr_str.to_socket_addrs() {
