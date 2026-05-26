@@ -9,7 +9,7 @@ use crossterm::{
     terminal::{self, Clear, ClearType},
 };
 
-pub struct Raw {
+pub struct Term {
     state: Mutex<InputState>,
 }
 
@@ -18,7 +18,7 @@ struct InputState {
     pos: usize,
 }
 
-impl Raw {
+impl Term {
     pub fn new() -> Self {
         let _ = terminal::enable_raw_mode();
         let _ = execute!(stdout(), crossterm::event::EnableBracketedPaste);

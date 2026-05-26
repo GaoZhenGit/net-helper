@@ -1,5 +1,5 @@
-mod raw;
-mod line;
+mod term;
+mod pipe;
 
 use std::io::{IsTerminal, Write};
 use std::sync::OnceLock;
@@ -10,16 +10,16 @@ static QUIT: AtomicBool = AtomicBool::new(false);
 static BACKEND: OnceLock<Backend> = OnceLock::new();
 
 enum Backend {
-    Raw(raw::Raw),
-    Line(line::Line),
+    Raw(term::Term),
+    Line(pipe::Pipe),
 }
 
 fn get() -> &'static Backend {
     BACKEND.get_or_init(|| {
         if std::io::stdout().is_terminal() {
-            Backend::Raw(raw::Raw::new())
+            Backend::Raw(term::Term::new())
         } else {
-            Backend::Line(line::Line::new())
+            Backend::Line(pipe::Pipe::new())
         }
     })
 }

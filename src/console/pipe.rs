@@ -4,12 +4,12 @@ use std::sync::{mpsc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-pub struct Line {
+pub struct Pipe {
     rx: Mutex<mpsc::Receiver<String>>,
     eof: AtomicBool,
 }
 
-impl Line {
+impl Pipe {
     pub fn new() -> Self {
         let (tx, rx) = mpsc::channel();
         thread::spawn(move || {
