@@ -8,8 +8,9 @@ $Clean = $args -contains '-Clean'
 $Ver  = ($args | Where-Object { $_ -match '^(v?\d+\.\d+\.\d+|v\d{4}\.\d{2}\.\d{2}\.\d{4})$' } | Select-Object -First 1)
 if ($Ver) { $env:NETHELPER_VERSION = $Ver } else { $env:NETHELPER_VERSION = $null }
 
-$winTarget  = "x86_64-pc-windows-gnu"
-$linuxTarget = "x86_64-unknown-linux-musl"
+$winTarget     = "x86_64-pc-windows-gnu"
+$linuxTarget   = "x86_64-unknown-linux-musl"
+$linuxArmTarget = "aarch64-unknown-linux-musl"
 
 if ($Clean) {
     Write-Host "=== Cleaning project artifacts (keeping dependencies) ===" -ForegroundColor Cyan
@@ -17,6 +18,8 @@ if ($Clean) {
     Write-Host "  Removed target\$winTarget\release\net-helper*"
     cargo clean -p net-helper --release --target $linuxTarget
     Write-Host "  Removed target\$linuxTarget\release\net-helper*"
+    cargo clean -p net-helper --release --target $linuxArmTarget
+    Write-Host "  Removed target\$linuxArmTarget\release\net-helper*"
 }
 
 Write-Host "`n=== Windows ===" -ForegroundColor Cyan
@@ -27,7 +30,12 @@ Write-Host "`n=== Linux (musl) ===" -ForegroundColor Cyan
 cargo zigbuild --release --target $linuxTarget
 Copy-Item "target\$linuxTarget\release\net-helper" "target\net-helper" -Force
 
+Write-Host "`n=== Linux ARM64 (musl) ===" -ForegroundColor Cyan
+cargo zigbuild --release --target $linuxArmTarget
+Copy-Item "target\$linuxArmTarget\release\net-helper" "target\net-helper-arm64" -Force
+
 Write-Host "`n=== Done ===" -ForegroundColor Green
 Write-Host "target\net-helper.exe"
 Write-Host "target\net-helper"
+Write-Host "target\net-helper-arm64"
 if ($Ver) { Write-Host "Version: $Ver" }
