@@ -40,19 +40,26 @@ pub fn write(f: impl FnOnce(&mut dyn Write) -> std::io::Result<()>) {
     match get() { Backend::Raw(r) => r.write(f), Backend::Line(l) => l.write(f) }
 }
 
-pub fn println(s: &str)  { write(|o| { writeln!(o, "{s}")?; Ok(()) }); }
-pub fn status(msg: &str) { write(|o| { writeln!(o, "{msg}")?; Ok(()) }); }
+pub fn println(s: &str)  { write(|o| { write!(o, "{}{}", s, eol())?; Ok(()) }); }
+pub fn status(msg: &str) { write(|o| { write!(o, "{}{}", msg, eol())?; Ok(()) }); }
+
+fn eol() -> &'static str {
+    match get() {
+        Backend::Raw(_) => "\r\n",
+        Backend::Line(_) => "\n",
+    }
+}
 
 pub fn recv(data: &[u8]) {
-    write(|o| { write!(o, "[recv {}]\r\n", size_fmt(data.len()))?; write_prefixed(o, data, "<- ") });
+    write(|o| { write!(o, "[recv {}]{}", size_fmt(data.len()), eol())?; write_prefixed(o, data, "<- ") });
 }
 
 pub fn recv_from(from: &str, data: &[u8]) {
-    write(|o| { write!(o, "[recv {} {}]\r\n", from, size_fmt(data.len()))?; write_prefixed(o, data, "<- ") });
+    write(|o| { write!(o, "[recv {} {}]{}", from, size_fmt(data.len()), eol())?; write_prefixed(o, data, "<- ") });
 }
 
 pub fn send(data: &[u8]) {
-    write(|o| { write!(o, "[send {}]\r\n", size_fmt(data.len()))?; write_prefixed(o, data, "-> ") });
+    write(|o| { write!(o, "[send {}]{}", size_fmt(data.len()), eol())?; write_prefixed(o, data, "-> ") });
 }
 
 // ── shared ─────────────────────────────────────────────
@@ -65,10 +72,11 @@ fn size_fmt(n: usize) -> String {
 
 fn write_prefixed(o: &mut dyn Write, data: &[u8], prefix: &str) -> std::io::Result<()> {
     let pfx = prefix.as_bytes();
+    let le = eol().as_bytes();
     let mut s = 0;
     for (i, &b) in data.iter().enumerate() {
-        if b == b'\n' { o.write_all(pfx)?; o.write_all(&data[s..i])?; o.write_all(b"\r\n")?; s = i + 1; }
+        if b == b'\n' { o.write_all(pfx)?; o.write_all(&data[s..i])?; o.write_all(le)?; s = i + 1; }
     }
-    if s < data.len() { o.write_all(pfx)?; o.write_all(&data[s..])?; o.write_all(b"\r\n")?; }
+    if s < data.len() { o.write_all(pfx)?; o.write_all(&data[s..])?; o.write_all(le)?; }
     Ok(())
 }
