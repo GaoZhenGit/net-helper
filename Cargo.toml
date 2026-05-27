@@ -2,6 +2,7 @@
 name = "net-helper"
 version = "1.0.0"
 edition = "2021"
+authors = ["GaoZhenGit <912815282@qq.com>"]
 
 [dependencies]
 crossterm = "0.28"
