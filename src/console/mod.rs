@@ -44,15 +44,15 @@ pub fn println(s: &str)  { write(|o| { writeln!(o, "{s}")?; Ok(()) }); }
 pub fn status(msg: &str) { write(|o| { writeln!(o, "{msg}")?; Ok(()) }); }
 
 pub fn recv(data: &[u8]) {
-    write(|o| { write!(o, "[recv {}]\n", size_fmt(data.len()))?; write_prefixed(o, data, "<- ") });
+    write(|o| { write!(o, "[recv {}]\r\n", size_fmt(data.len()))?; write_prefixed(o, data, "<- ") });
 }
 
 pub fn recv_from(from: &str, data: &[u8]) {
-    write(|o| { write!(o, "[recv {} {}]\n", from, size_fmt(data.len()))?; write_prefixed(o, data, "<- ") });
+    write(|o| { write!(o, "[recv {} {}]\r\n", from, size_fmt(data.len()))?; write_prefixed(o, data, "<- ") });
 }
 
 pub fn send(data: &[u8]) {
-    write(|o| { write!(o, "[send {}]\n", size_fmt(data.len()))?; write_prefixed(o, data, "-> ") });
+    write(|o| { write!(o, "[send {}]\r\n", size_fmt(data.len()))?; write_prefixed(o, data, "-> ") });
 }
 
 // ── shared ─────────────────────────────────────────────
@@ -67,8 +67,8 @@ fn write_prefixed(o: &mut dyn Write, data: &[u8], prefix: &str) -> std::io::Resu
     let pfx = prefix.as_bytes();
     let mut s = 0;
     for (i, &b) in data.iter().enumerate() {
-        if b == b'\n' { o.write_all(pfx)?; o.write_all(&data[s..i])?; o.write_all(b"\n")?; s = i + 1; }
+        if b == b'\n' { o.write_all(pfx)?; o.write_all(&data[s..i])?; o.write_all(b"\r\n")?; s = i + 1; }
     }
-    if s < data.len() { o.write_all(pfx)?; o.write_all(&data[s..])?; o.write_all(b"\n")?; }
+    if s < data.len() { o.write_all(pfx)?; o.write_all(&data[s..])?; o.write_all(b"\r\n")?; }
     Ok(())
 }
